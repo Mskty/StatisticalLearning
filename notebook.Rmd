@@ -1,0 +1,102 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+# imports
+library(Hmisc)
+library(ggplot2)
+library(fastDummies)
+```
+
+```{r}
+# read csv
+df <- read.csv("dataset_final.csv")
+head(df,10)
+sapply(df, typeof)
+```
+
+```{r}
+# convert drafted to integer
+df$drafted[df$drafted == "False"] <- 0
+df$drafted[df$drafted == "True"] <- 1
+df$drafted <- as.integer(df$drafted)
+head(df$drafted)
+```
+
+```{r}
+# Data exploration
+
+#column names
+colnames(df)
+
+# unique player names
+length(df$name)
+
+# print leading players by points for testing
+ordered <- df[order(df$points, decreasing = TRUE),] 
+head(ordered[,c('name','points','drafted')],10)
+```
+```{r}
+# column names
+colnames(df)
+# make dummy for categorical position
+df <- dummy_cols(df, select_columns = 'position')
+head(df)
+# remove useless columns
+drop <- c("name","school","start_season","position")
+df = df[,!(names(df) %in% drop)]
+head(df)
+```
+
+
+```{r}
+# first divide training and test set for classification
+# check how many players per year
+# players per year
+table(df$end_season)
+# drafted per year
+table(df$end_season,df$drafted)
+#total players
+nrow(df)
+
+# test candidate:
+ratio = (1420+1450)/15633 * 100
+ratio
+
+# first tentative split: 2019-2020 on test set rest on training
+# get row index
+index_test  = which(df$end_season > 2018)
+length(index_test)
+index_test
+test <- df[index_test, ]
+train <- df[-index_test, ]
+# test and train are 2 distinct dataframes from df, but row_names (index) are not resetted
+```
+```{r}
+# EDA ON TRAINSET
+table(train$end_season, train$drafted)
+# ggplot(train, aes(end_season, weight, fill = drafted)) + geom_bar(stat = "identity", position=position_dodge()) # DISCOVER HOW TO GET THE Y = COUNT AND GET THE BAR SIDE BY SIDE
+```
+
+```{r}
+# training classifiers
+# remove the end season column
+drop <- c("end_season")
+train = train[,!(names(train) %in% drop)]
+train = test[,!(names(test) %in% drop)]
+mod <- glm( drafted ~ ., data = train)
+
+```
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.

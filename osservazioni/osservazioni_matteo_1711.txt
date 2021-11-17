@@ -1,0 +1,24 @@
+1. CONTROLLARE MODELLI DA SLIDES E RIPORTARE QUA
+2. CONTROLLARE FEATURE SELECTION DA SLIDES E RIPORTARE QUA
+3. CONTROLLARE MODELLI SU FILE R E RIPORTARE ISTRUZIONI
+4. CONTROLLARE FEATURE SELECTION DA FILE R E RIPORTARE ISTRUZIONI
+
+
+(1) MODELLI PER CLASSIFICAZIONE BINARIA:
+LINEARI:
+- glm logistic regression (family = binomial)
+- poisson -> inutile per noi (funziona con target distribuito come poisson)
+- bayes classifier -> non fatto (NOTA: Under the broad topic of "Gaussian Discriminant Analysis (GDA)" 
+					  there are several techniques: QDA, LDA, GNB, and DLDA 
+					 (quadratic DA, linear DA, gaussian naive bayes, diagonal LDA).
+- LDA ( a differenza di LR fa assunzioni sulla shape delle densities nello spazio delle features, controllare)
+
+NON LINEARI:
+- QDA
+- KNN
+
+SEARCH ON INTERNET FOR THE ASSUMPIONS ON THE DATA THAT EACH MODEL NEEDS ( esempio: LDA assume la distribuzione normale di ogni feature, altrimenti
+																			funziona male -> CON CATEGORICHE INUTILIZZABILE)
+
+(2) FEATURE SELECTION
+- use packages for hard selection on final modedl (like best gml)

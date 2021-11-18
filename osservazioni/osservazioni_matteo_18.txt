@@ -1,0 +1,3 @@
+
+LA MATRICE DI CORRELLAZIONE MOSTRA OVVIAMENTE FORTE CORRELAZIONE CHE CREA PROBLEMI DI COLLINEARITY tra le variabili di cui abbiamo tiri/tiri efficaci/percentuali
+Siccome la correlazione rispetto a drafted mostra che tiri ha generalmente più correlazione rispetto a tiri efficaci, propongo di togliere i tiri efficati e lasciare totali e percentuale    

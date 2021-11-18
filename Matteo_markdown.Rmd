@@ -13,17 +13,40 @@ This is an R Markdown document. Markdown is a simple formatting syntax for autho
 
 When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
-```{r cars}
+# 0 EXPLANATION OF FEATURES
+Height: height of player
+Weight: weight of player
+Positions: role of player (guard center forward)
+Games played: games played avg per season
+Games started: games started avg per season
+Minutes per game: minutes played avg per game
+Field Goal: any shot, other than a free throw, that is attempted by a player. Scored, avg per game
+Field Attempts: field goals attempted (successful or not) avg per game
+Field Percentage: total field goal / field %
+Two Pointers: shots worth 2 points scored avg per game
+Two Point Attempts: 2 points shots attempted avg per game
+Two Point Percentage: two pointers / attempts %
+Total Rebounds:  a statistic awarded to a player who retrieves the ball after a missed field goal or free throws, avg per game
+Turnovers: when a team loses possession of the ball to the opposing team before a player takes a shot at their team's basket, avg per game
+Three pointers: shots worth 3 points scored avg per game
+Three Point Attempts: 3 points shots attempted avg per game
+Three Point Percentage: three pointers / attempts %
+Free Throws: shots worth 1 points scored avg per game
+Free Throw Attempts: 1 points shots attempted avg per game
+Free Throw Percentage: free throws / attempts %
+Assists : number of assists avg per game
+Steals: when a player on takes possession of the basketball from an opposing player, avg per game
+Blocks: blocks avg per game
+Points: points avg per game
+Offensive Rebounds: rebounds done in attack avg per game
+Defensive Rebounds: rebounds done in defense avg per game
+```{r}
 library(Hmisc)
 library(ggplot2)
 library(fastDummies)
 library(tidyr)
-library(tidyverse)
+library(dplyr)
 ```
-
-## Including Plots
-
-You can also embed plots, for example:
 
 ```{r pressure, echo=FALSE}
 # read csv
@@ -31,5 +54,87 @@ df <- read.csv("dataset_final.csv")
 head(df,10)
 sapply(df, typeof)
 ```
+```{r}
+# convert drafted to integer
+df$drafted[df$drafted == "False"] <- 0
+df$drafted[df$drafted == "True"] <- 1
+df$drafted <- as.integer(df$drafted)
+head(df$drafted)
+```
+
+```{r}
+# Data exploration
+
+#column names
+colnames(df)
+
+# unique player names
+length(df$name)
+
+# print leading players by points for testing
+ordered <- df[order(df$points, decreasing = TRUE),] 
+head(ordered[,c('name','points','drafted')],10)
+```
+
+```{r}
+# column names
+colnames(df)
+# make dummy for categorical position
+df <- dummy_cols(df, select_columns = 'position')
+head(df)
+# remove useless columns
+drop <- c("name","school","start_season","position")
+df = df[,!(names(df) %in% drop)]
+head(df)
+```
+
+```{r}
+# first divide training and test set for classification
+# check how many players per year
+# players per year
+table(df$end_season)
+# drafted per year
+table(df$end_season,df$drafted)
+#total players
+nrow(df)
+
+# test candidate:
+ratio = (1420+1450)/15633 * 100
+ratio
+
+# first tentative split: 2019-2020 on test set rest on training
+# get row index
+index_test  = which(df$end_season > 2018)
+length(index_test)
+#index_test
+test <- df[index_test, ]
+train <- df[-index_test, ]
+# test and train are 2 distinct dataframes from df, but row_names (index) are not resetted
+```
+
+```{r}
+# training classifiers
+# remove the end season column
+train =  train %>% select(-end_season)
+test = test %>% select(-end_season)
+# remove total rebound since it makes the matrix singular (total reb = def + off reb)
+train =  train %>% select(-total_reb)
+test = test %>% select(-total_reb)
+# delete a dummy variable
+train =  train %>% select(-position_Center)
+test = test %>% select(-position_Center)
+# (ALREADY TESTED) Removing total points covariates because they cause linear relation
+train =  train %>% select(-c(field_goal, field_attmps,field_pct))
+test = test %>% select(-c(field_goal, field_attmps,field_pct))
+# getting a basic logistic regressor model
+mod <- glm( drafted ~ ., data = train, family = binomial)
+summary(mod)
+# testing prediction on the test set
+
+```
+```{r}
+
+```
+
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

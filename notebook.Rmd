@@ -42,6 +42,7 @@ length(df$name)
 ordered <- df[order(df$points, decreasing = TRUE),] 
 head(ordered[,c('name','points','drafted')],10)
 ```
+
 ```{r}
 # column names
 colnames(df)

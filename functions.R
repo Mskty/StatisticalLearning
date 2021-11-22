@@ -8,6 +8,7 @@ library(sampling)
 library(pROC)
 library(zoo)
 library(forecast)
+library(bestglm)
 
 ### FUNCTION DEFINITIONS ###
 # ALL PARAMETERS ARE NOT PASSED BY REFERENCE BUT ARE A COPY IN FUNCTIONS
@@ -23,18 +24,15 @@ prepare_dataset <- function(df) {
   df$games_started <- round(df$games_started, 3)
   df$height <- round(df$height, 3)
   df$weight <- round(df$weight, 3)
-  # calculate wrong three points percentage and remove na TEMPORARY IF SCRAPED
-  df$three_pct <- round(df$three_ptrs/df$three_pattmp, 3)
-  df[is.na(df)] <- 0
-  df$weight <- round(df$three_pct, 3)
   # make dummy for categorical position
   df$drafted <- as.integer(df$drafted)
   df <- dummy_cols(df, select_columns = 'position')
   # remove useless columns
-  drop <- c("name","school","start_season","position")
+  df =  df %>% select(-c(name, start_season, position))
+  #drop <- c("name","start_season","position")
   # move drafted to last column
   df = df %>% relocate(drafted, .after = last_col())
-  df = df[,!(names(df) %in% drop)]
+  #df = df[,!(names(df) %in% drop)]
   
   #return dataframe
   return(df)
@@ -42,8 +40,8 @@ prepare_dataset <- function(df) {
 
 # Full dataset preparation for classification
 full_dataset_for_classification <- function(df) {
-  # delete a dummy variable
-  df =  df %>% select(-position_Center)
+  # delete a dummy variable WE DECIDED TO KEEP 3 DUMMIES (we can't because multicollinearity)
+   df =  df %>% select(-position_Center)
   # n features before (not counting end_season):
   print(ncol(df))
   # remove total rebound since it makes the matrix singular (total reb = def + off reb)
@@ -71,7 +69,7 @@ train_test_split <- function(df, split_season){
   #total players
   nrow(df)
   # test candidate:
-  ratio = (1420+1450)/15633 * 100
+  ratio = (1437+1474)/15797 * 100
   print(ratio)
   
   # make the split
@@ -180,7 +178,7 @@ search_best_knn <- function(train, maxk) {
   f1 <- c()
   k.values <- seq(1,maxk,1)
   for (i in k.values) {
-    knn.pred <- knn(train[1:12], sample.test[1:12], cl = train$drafted, k = i)
+    knn.pred <- knn(train[1:18], sample.test[1:18], cl = train$drafted, k = i)
     f1 <- c(f1, report_f1(sample.test$drafted, knn.pred))
   }
   plot(k.values, f1, type = 'l', xlab = 'Number of neighbors k', ylab = 'F1 Score')
@@ -278,8 +276,86 @@ report_auc <- function(values, pred) {
 
 ## FUNCTIONS FEATURE SELECTION ##
 
+select_glm_AIC <- function(train) {
+  # TESTED : IT WORKS AS INTENDED
+  # glm.AIC <- bestglm(train, IC = 'AIC', method = "backward", family=binomial) NOME SOLO EXAUSTED CON BINOMIAL
+  # intializing starting AIC (full model) and covariate list
+  aics.best <- c(AIC(glm(drafted~., data = train, family = binomial)))
+  columns.kept <- c(names(train[-19]))
+  columns.deleted <- c()
+  while (TRUE) {
+    aics.loop <- c()
+    columns.loop <- c()
+    for (i in columns.kept) {
+      # get all the aics for removing one of the remaining column
+      aics.loop <- c (aics.loop, 
+                      AIC(glm(drafted~., data = train[,!(names(train) %in% c(columns.deleted, i))], family = binomial)))
+      columns.loop <- c(columns.loop, i)
+    }
+    # break if no improvements
+    if(min(aics.loop) > tail(aics.best,1)) {
+      break
+    }
+    # add the best removal to the removed list, this gives the index for columns.loop
+    index = which(aics.loop == min(aics.loop))[1]
+    columns.deleted <- c(columns.deleted, columns.loop[index])
+    # remove the column removed from the remaining columns list
+    columns.kept <- columns.kept[! columns.kept %in% c(columns.loop[index])]
+    # add the new AIC value to the best list
+    aics.best <- c(aics.best, min(aics.loop))
+    # break if we removed all the columns
+    if (length(columns.kept) == 0) {
+      break
+    }
+  }
+  # return the columns kept for the moment
+  print(columns.deleted)
+  print(aics.best)
+  return(columns.kept)
+}
+
+select_glm_BIC <- function(train) {
+  # TESTED : IT WORKS AS INTENDED
+  # glm.AIC <- bestglm(train, IC = 'AIC', method = "backward", family=binomial) NOME SOLO EXAUSTED CON BINOMIAL
+  # intializing starting AIC (full model) and covariate list
+  bics.best <- c(BIC(glm(drafted~., data = train, family = binomial)))
+  columns.kept <- c(names(train[-19]))
+  columns.deleted <- c()
+  while (TRUE) {
+    bics.loop <- c()
+    columns.loop <- c()
+    for (i in columns.kept) {
+      # get all the bics for removing one of the remaining column
+      bics.loop <- c (bics.loop, 
+                      BIC(glm(drafted~., data = train[,!(names(train) %in% c(columns.deleted, i))], family = binomial)))
+      columns.loop <- c(columns.loop, i)
+    }
+    # break if no improvements
+    if(min(bics.loop) > tail(bics.best,1)) {
+      break
+    }
+    # add the best removal to the removed list, this gives the index for columns.loop
+    index = which(bics.loop == min(bics.loop))[1]
+    columns.deleted <- c(columns.deleted, columns.loop[index])
+    # remove the column removed from the remaining columns list
+    columns.kept <- columns.kept[! columns.kept %in% c(columns.loop[index])]
+    # add the new AIC value to the best list
+    bics.best <- c(bics.best, min(bics.loop))
+    # break if we removed all the columns
+    if (length(columns.kept) == 0) {
+      break
+    }
+  }
+  # return the columns kept for the moment
+  print(columns.deleted)
+  print(bics.best)
+  return(columns.kept)
+}
+
+
+
 ### MAIN ###
-df <- read.csv("dataset_final.csv")
+df <- read.csv("dataset_finale.csv")
 head(df)
 
 df = prepare_dataset(df)
@@ -291,7 +367,7 @@ head(train)
 head(test)
 
 # test prediction and report with glm threshold 0.5
-mod.glm <- model_glm(train)
+mod.glm <- glm(drafted~., data = train, family = binomial)
 summary(mod.glm)
 pred.glm <- predict(mod.glm, test, type= "response")
 report_auc(test$drafted, pred.glm)
@@ -300,6 +376,17 @@ pred.glm[pred.glm >= tr] <- 1
 pred.glm[pred.glm < tr] <- 0
 report_all_metrics(test$drafted, pred.glm)
 report_confusion_matrix(test$drafted, pred.glm)
+
+### ORDER OF REMOVAL BACKWARD STEPWISE SELECTION ###
+# mod.glm <- glm(drafted~.-free_pct, data = train, family = binomial)
+# summary(mod.glm)
+# 1. free pct 0.830121 
+# 2. off_reb 0.364819
+# 3. games_started 0.300908
+# 4. two_pct 0.046028
+# 5. three_pct 0.044832
+# 6. def_reb 0.017083
+# END, all 3 *
 
 
 

@@ -131,9 +131,9 @@ model_baseline_report <- function(test) {
   print(report_confusion_matrix(test$drafted, pred.random))
   print(report_all_metrics(test$drafted, pred.random))
   # NON VA LA CONFUSION MATRIX SICCOME NON SONO PREDETTI 1
-  # print("performance for Zeros Classifier")
-  # print(report_confusion_matrix(test$drafted, pred.zeros))
-  # print(report_all_metrics(test$drafted, pred.zeros))
+  print("performance for Zeros Classifier")
+  print(report_confusion_matrix(test$drafted, pred.zeros))
+  print(report_all_metrics(test$drafted, pred.zeros))
 }
 
 # GLM
@@ -141,6 +141,7 @@ model_glm <- function(train) {
   mod <- glm(drafted~., data = train, family = binomial)
   return(mod)
 }
+
 # LDA
 model_lda <- function(train) {
   mod <- lda(drafted~., data = train)
@@ -196,34 +197,34 @@ search_best_knn <- function(train, maxk) {
 
 # Confusion matrix
 report_confusion_matrix <- function(values, pred) {
-  mtx <- as.matrix(table(values, pred))
+  mtx <- as.matrix(table(factor(values,levels = 0:1) , factor(pred, levels =0:1)))
   return (mtx)
 }
 
 # accuracy
 report_accuracy <- function(values, pred) {
-  mtx <- as.matrix(table(values, pred))
+  mtx <- as.matrix(table(factor(values,levels = 0:1) , factor(pred, levels =0:1)))
   accuracy <- round((mtx[1,1] + mtx[2,2]) / sum(mtx), 3)
   return(accuracy)
 }
 
 # precision
 report_precision <- function(values, pred) {
-  mtx <- as.matrix(table(values, pred))
+  mtx <- as.matrix(table(factor(values,levels = 0:1) , factor(pred, levels =0:1)))
   precision <-  round(mtx[2, 2] / sum(mtx[, 2]), 3)
   return(precision)
 }
 
 # recall
 report_recall <- function(values, pred) {
-  mtx <- as.matrix(table(values, pred))
+  mtx <- as.matrix(table(factor(values,levels = 0:1) , factor(pred, levels =0:1)))
   recall = round(mtx[2,2] / sum(mtx[2,]), 3)
   return(recall)
 }
 
 # specificity 
 report_specificity <- function(values, pred) {
-  mtx <- as.matrix(table(values, pred))
+  mtx <- as.matrix(table(factor(values,levels = 0:1) , factor(pred, levels =0:1)))
   specificity = round(mtx[1,1] / sum(mtx[1, ]), 3)
   return(specificity)
 }
@@ -246,7 +247,7 @@ report_balanced_accuracy <- function(values, pred) {
 
 # table with other metrics
 report_all_metrics <- function(values, pred) {
-  mtx <- as.matrix(table(values, pred))
+  mtx <- as.matrix(table(factor(values,levels = 0:1) , factor(pred, levels =0:1)))
   accuracy = round((mtx[1,1] + mtx[2,2]) / sum(mtx), 3)
   precision =  round(mtx[2, 2] / sum(mtx[, 2]), 3)
   recall = round(mtx[2,2] / sum(mtx[2,]), 3) # also called sensitivity
@@ -263,10 +264,11 @@ report_all_metrics <- function(values, pred) {
 
 # table with value and graph of auc 
 report_auc <- function(values, pred) {
-  metrics.roc <- roc(values, pred, levels=c('1','0'))
+  metrics.roc <- roc(values, pred, levels=c(0,1))
+  print(metrics.roc)
   # plotting
   plot(metrics.roc, print.auc = TRUE, legacy.axes = TRUE, xlab = 'False positive rate',
-       ylab = 'True positive rate')
+       ylab = 'True positive rate', col = 'red')
   # print best threshold
   print(coords(metrics.roc, 'best'))
   # return the auc score
@@ -287,6 +289,17 @@ train = results[[1]]
 test = results[[2]]
 head(train)
 head(test)
+
+# test prediction and report with glm threshold 0.5
+mod.glm <- model_glm(train)
+summary(mod.glm)
+pred.glm <- predict(mod.glm, test, type= "response")
+report_auc(test$drafted, pred.glm)
+tr <- 0.5
+pred.glm[pred.glm >= tr] <- 1
+pred.glm[pred.glm < tr] <- 0
+report_all_metrics(test$drafted, pred.glm)
+report_confusion_matrix(test$drafted, pred.glm)
 
 
 

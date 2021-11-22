@@ -1,0 +1,11 @@
+1. togliere points done
+2. calcoalre three pct done
+							2.5 calcolare numero corretto di drafted da scuole per anno manualmente dai files
+3. funzioni di classificazione done
+4. vedere come vanno i modelli (decidere metrica) -> f1 score per questa frase: When working on problems with heavily imbalanced datasets AND you care more about detecting positives than detecting negatives (outlier detection / anomaly detection) then you would prefer the F1-score more. When working on problems with heavily imbalanced datasets AND you care more about detecting positives than detecting negatives (outlier detection / anomaly detection) then you would prefer the F1-score more.
+5. valutare i modelli
+
+
+
+
+SCRIVERE TABLE table(factor(test$drafted,levels = 0:1) , factor(pred.zeros, levels =0:1))

@@ -1,0 +1,6 @@
+MODELS FOR BINARY CLASSIFICATION:
+TRIVIAL CLASSIFIER: chooses class 0 always
+LDA: check normality per classes (categorical data non given)
+QDA: (better if data is not linearly separable in the feature space but in  our case it sucks for sure)
+KNN: no supposition, find the best hyperparameter
+GLM: with all the feature selection

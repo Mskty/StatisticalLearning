@@ -391,4 +391,144 @@ kable(table.df)
 
 ### START OF FEATURE SELECTION ON GLM
 
+# WHAT WE USED: CONSTRAIN BASED STEPWISE SELECTION, AIC BACKWARD STEPWISE SELECTION, BIC BACKWARD STEPWISE SELECTION, GLM LASSO REGULARIZATION
+# Unable to use bestglm for aid and bic given that for logistical regression it only exposes a method will exhaustive search, leading to (in our case) 2^19 models evaluation
+
+# CONSTRAIN BASED STEPWISE SELECTION
+# start with constrain based stepwise selection (remove the highest p value and refit the model then remove highest p value then refit etc untill all covariates have *** for significance)
+# this is the order of the models fitting 
+mod.glm.full <- mod.glm <- glm(drafted~., data = train, family = binomial)
+mod.glm.red.constrains <- glm(drafted~.-free_pct, data = train, family = binomial)
+mod.glm.red.constrains <- glm(drafted~.-free_pct-off_reb, data = train, family = binomial)
+mod.glm.red.constrains <- glm(drafted~.-free_pct-off_reb-games_started, data = train, family = binomial)
+mod.glm.red.constrains <- glm(drafted~.-free_pct-off_reb-games_started-weight, data = train, family = binomial)
+mod.glm.red.constrains <- glm(drafted~.-free_pct-off_reb-games_started-weight-two_pct, data = train, family = binomial)
+mod.glm.red.constrains <- glm(drafted~.-free_pct-off_reb-games_started-weight-two_pct-three_pct, data = train, family = binomial)
+mod.glm.red.constrains <- glm(drafted~.-free_pct-off_reb-games_started-weight-two_pct-three_pct-def_reb, data = train, family = binomial)
+constrains.columns <- c("free_pct", "off_reb", "games_started", "weight", "two_pct", "three_pct", "def_reb")
+# print the columns removed and the number of removed
+constrains.columns
+length(constrains.columns)
+
+# AIC BACKWARD STEPWISE SELECTION
+# we SHOW our function for the backward on the glm it returns the list of columns
+select_glm_AIC <- function(train) {
+  # TESTED : IT WORKS AS INTENDED
+  # glm.AIC <- bestglm(train, IC = 'AIC', method = "backward", family=binomial) NON UTILIZZABILE SOLO EXAUSTED CON BINOMIAL (logit link)
+  # intializing starting AIC (full model) and covariates list
+  aics.best <- c(AIC(glm(drafted~., data = train, family = binomial)))
+  columns.kept <- c(names(train[-20]))
+  columns.deleted <- c()
+  while (TRUE) {
+    aics.loop <- c()
+    columns.loop <- c()
+    for (i in columns.kept) {
+      # get all the aics for removing one of the remaining column
+      aics.loop <- c (aics.loop, 
+                      AIC(glm(drafted~., data = train[,!(names(train) %in% c(columns.deleted, i))], family = binomial)))
+      columns.loop <- c(columns.loop, i)
+    }
+    # break if no improvements
+    if(min(aics.loop) > tail(aics.best,1)) {
+      break
+    }
+    # add the best removal to the removed list, this gives the index for columns.loop
+    index <- which(aics.loop == min(aics.loop))[1]
+    columns.deleted <- c(columns.deleted, columns.loop[index])
+    # remove the column removed from the remaining columns list
+    columns.kept <- columns.kept[! columns.kept %in% c(columns.loop[index])]
+    # add the new AIC value to the best list
+    aics.best <- c(aics.best, min(aics.loop))
+    # break if we removed all the columns
+    if (length(columns.kept) == 0) {
+      break
+    }
+  }
+  # return the columns deleted and aic_best 
+  aic.columns <- list(aics.best,columns.deleted)
+  return(aic.columns)
+}
+
+# let's get the deleted columns and the aics to plot
+aic.output <- select_glm_AIC(train)
+aic.columns <- aic.output[[1]]
+aic.values <- aic.output[[2]]
+# print columns removed and number
+aic.columns
+length(aic.columns)
+# let's plot the aics (x is the number of columns removed == index of the aic.values vector)
+aic.numbers <- c(0:(length(aic.values)-1)) # -1 because it starts from 0
+plot(aic.numbers, aic.values, type = 'l', xlab = 'Number of columns removed', ylab = 'best AIC')
+
+# BIC BACKWARD STEPWISE SELECTION
+# it's the same function but it uses BIC instead of AIC we don't show the function
+select_glm_BIC <- function(train) {
+  # intializing starting BIC (full model) and covariate list
+  bics.best <- c(BIC(glm(drafted~., data = train, family = binomial)))
+  columns.kept <- c(names(train[-20]))
+  columns.deleted <- c()
+  while (TRUE) {
+    bics.loop <- c()
+    columns.loop <- c()
+    for (i in columns.kept) {
+      # get all the bics for removing one of the remaining column
+      bics.loop <- c (bics.loop, 
+                      BIC(glm(drafted~., data = train[,!(names(train) %in% c(columns.deleted, i))], family = binomial)))
+      columns.loop <- c(columns.loop, i)
+    }
+    # break if no improvements
+    if(min(bics.loop) > tail(bics.best,1)) {
+      break
+    }
+    # add the best removal to the removed list, this gives the index for columns.loop
+    index = which(bics.loop == min(bics.loop))[1]
+    columns.deleted <- c(columns.deleted, columns.loop[index])
+    # remove the column removed from the remaining columns list
+    columns.kept <- columns.kept[! columns.kept %in% c(columns.loop[index])]
+    # add the new AIC value to the best list
+    bics.best <- c(bics.best, min(bics.loop))
+    # break if we removed all the columns
+    if (length(columns.kept) == 0) {
+      break
+    }
+  }
+  # return the columns deleted and aic_best 
+  bic.columns <- list(bics.best,columns.deleted)
+  return(bic.columns)
+  
+}
+# let's get the deleted columns and the aics to plot
+bic.output <- select_glm_BIC(train)
+bic.columns <- bic.output[[1]]
+bic.values <- bic.output[[2]]
+# print columns removed and number
+bic.columns
+length(bic.columns) # bic favors simpler models so columns removed should be more than aic
+# let's plot the bics (x is the number of columns removed == index of the bic.values vector)
+bic.numbers <- c(0:(length(bic.values)-1)) # -1 because it starts from 0
+plot(bic.numbers, bic.values, type = 'l', xlab = 'Number of columns removed', ylab = 'best BIC')
+
+# LASSO
+# We used glmnet with 10 fold cross validation to select from 100 values of lambdas
+# The values of lambdas to try were pre determines using the function lambdaseq()that finds the max value of lambda that if used sets all coefficients to 0, and then logaritmhically generates other 99 smaller lamdas to try
+set.seed(42) # seed for cross validation
+x.seq <- as.matrix(train[,1:19])
+y.seq <- train[,20]
+lambda.seq <- lambdaseq(x.seq, y.seq)$lambda
+X.vars <- model.matrix(train$drafted~. , train)[,-1] #removes column of ones from model.matrix that we must use for glmnet
+Y.vars <- train$drafted
+# uses cross validation 10 fold (default) (uses misclassification error to determine best lambda) to find best lambda over the 100 in the list
+cv.lasso <- cv.glmnet(X.vars, Y.vars, lambda = lambda.seq, type.measure = 'class', family ='binomial') 
+# print results
+cv.lasso$cvm
+# get best lambda and print it
+best.lambda <- cv.lasso$lambda.min
+best.lambda
+# we plot the results (default implementation of plot for glmnet)
+plot(cv.lasso)
+# WE CONSIDER THE LASSO MODEL HERE
+# build the model with lasso and best lambda
+mod.glm.lasso <- glmnet(X.vars, Y.vars, alpha = 1, lambda = best.lambda, family = 'binomial')
+# print coefficients (shows the ones put to zeros)
+coef(mod.glm.lasso)
 

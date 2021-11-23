@@ -433,7 +433,7 @@ coef(mod.glm.lasso)
 # find threshold
 X.vars.test <- model.matrix(test$drafted~. , test)[,-1]
 # Deprecated use a matrix as predictor. Unexpected results may be produced, please pass a numeric vector.
-pred.glm.lasso <- data.frame(round(predict(mod.glm.lasso, x.test, type= "response"), 4))
+pred.glm.lasso <- data.frame(round(predict(mod.glm.lasso, X.vars.test, type= "response"), 4))
 #pred.glm.lasso <- predict(mod.glm.lasso, x.test, type= "response")
 mod.glm.lasso.roc <- report_auc(test$drafted, pred.glm.lasso)
 coords(mod.glm.lasso.roc, 'best')
@@ -446,12 +446,13 @@ report_confusion_matrix(test$drafted, pred.glm.lasso)
 ### ORDER OF REMOVAL BACKWARD STEPWISE SELECTION ###
 # mod.glm <- glm(drafted~.-free_pct, data = train, family = binomial)
 # summary(mod.glm)
-# 1. free pct 0.830121 
-# 2. off_reb 0.364819
-# 3. games_started 0.300908
-# 4. two_pct 0.046028
-# 5. three_pct 0.044832
-# 6. def_reb 0.017083
+# 1. free pct 0.835450  
+# 2. off_reb 0.486644
+# 3. games_started 0.248764 
+# 4. weight 0.249887
+# 5. two_pct 0.046028
+# 6. three_pct 0.044832
+# 7. def_reb 0.017083
 # END, all 3 *
 
 mod.glm=select_glm_lasso(train)

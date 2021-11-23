@@ -9,6 +9,9 @@ library(pROC)
 library(zoo)
 library(forecast)
 library(bestglm)
+library(Matrix)
+library(glmnet)
+library(tsutils)
 
 ### FUNCTION DEFINITIONS ###
 # ALL PARAMETERS ARE NOT PASSED BY REFERENCE BUT ARE A COPY IN FUNCTIONS
@@ -41,7 +44,7 @@ prepare_dataset <- function(df) {
 # Full dataset preparation for classification
 full_dataset_for_classification <- function(df) {
   # delete a dummy variable WE DECIDED TO KEEP 3 DUMMIES (we can't because multicollinearity)
-   df =  df %>% select(-position_Center)
+  df =  df %>% select(-position_Center)
   # n features before (not counting end_season):
   print(ncol(df))
   # remove total rebound since it makes the matrix singular (total reb = def + off reb)
@@ -53,7 +56,7 @@ full_dataset_for_classification <- function(df) {
   # remove points because linear combination of the other point throws
   df = df %>% select(-c(points))
   # remove weight and seasons variable because consideration on the correlation mtx and boxplots
-  df =  df %>% select(-c(weight, seasons))
+  df =  df %>% select(-c(seasons))
   # n features after (not counting end_season):
   print(ncol(df))
   # IT KEEPS END_SEASON FOR TRAIN TEST SPLIT
@@ -270,12 +273,13 @@ report_auc <- function(values, pred) {
   # print best threshold
   print(coords(metrics.roc, 'best'))
   # return the auc score
-  metrics.auc = auc(metrics.roc)
-  return(metrics.auc)
+  metrics.auc <- auc(metrics.roc)
+  return(metrics.roc)
 }
 
 ## FUNCTIONS FEATURE SELECTION ##
 
+# AIC FEATURE SELECTION
 select_glm_AIC <- function(train) {
   # TESTED : IT WORKS AS INTENDED
   # glm.AIC <- bestglm(train, IC = 'AIC', method = "backward", family=binomial) NOME SOLO EXAUSTED CON BINOMIAL
@@ -314,6 +318,7 @@ select_glm_AIC <- function(train) {
   return(columns.kept)
 }
 
+# BIC FEATURE SELECTION
 select_glm_BIC <- function(train) {
   # TESTED : IT WORKS AS INTENDED
   # glm.AIC <- bestglm(train, IC = 'AIC', method = "backward", family=binomial) NOME SOLO EXAUSTED CON BINOMIAL
@@ -350,8 +355,43 @@ select_glm_BIC <- function(train) {
   print(columns.deleted)
   print(bics.best)
   return(columns.kept)
+  
 }
 
+# LASSO FEATURE SELECTION
+select_glm_lasso <- function(train) {
+  set.seed(42)
+  # grid <- 10ˆseq(7, -5, length = 100)
+  # Using lambdaseq to find list of lambdas, the max value sets all coefficients to 0
+  x.seq <- as.matrix(train[,1:18])
+  y.seq <- train[,19]
+  lambda.seq <- lambdaseq(x.seq, y.seq)$lambda
+  X.vars <- model.matrix(train$drafted~. , train)[,-1] #removes column of ones
+  Y.vars <- train$drafted
+  # TESTING FOR WEIGHTED CLASSIFICATION (not producing better selection so scrapped)
+  # fraction_0 <- rep(1 - sum(Y.vars == 0) / length(Y.vars), sum(Y.vars == 0))
+  # fraction_1 <- rep(1 - sum(Y.vars == 1) /length(Y.vars), sum(Y.vars == 1))
+  # weights <- length(Y.vars)
+  # weights[Y.vars == 0] <- fraction_0
+  # weights[Y.vars == 1] <- fraction_1
+  # glm.lasso <- cv.glmnet(X.vars, Y.vars, lambda = lambda.seq, weights = weights, type.measure = 'class', family ='binomial')
+  # nfolds 10 default
+  mod.glm.cv.lasso <- cv.glmnet(X.vars, Y.vars, lambda = lambda.seq, type.measure = 'class', family ='binomial')
+  # print results
+  print(mod.glm.cv.lasso$cvm)
+  # get best lambda and plot results
+  best.lambda <- mod.glm.cv.lasso$lambda.min
+  print(best.lambda)
+  plot(mod.glm.cv.lasso)
+  # train model and get coefficients
+  mod.glm.lasso <- glmnet(X.vars, Y.vars, alpha = 1, lambda = best.lambda, family = 'binomial')
+  print(coef(mod.glm.lasso))
+  # TEST should set all to 0: WORKING
+  # glm.model.lasso <- glmnet(X.vars, Y.vars, alpha = 1, lambda = lambda.seq[1], family = 'binomial')
+  # coef(glm.model.lasso)
+  
+  return(mod.glm.lasso)
+  }
 
 
 ### MAIN ###
@@ -377,6 +417,32 @@ pred.glm[pred.glm < tr] <- 0
 report_all_metrics(test$drafted, pred.glm)
 report_confusion_matrix(test$drafted, pred.glm)
 
+# Get lasso
+set.seed(42)
+x.seq <- as.matrix(train[,1:18])
+y.seq <- train[,19]
+lambda.seq <- lambdaseq(x.seq, y.seq)$lambda
+X.vars <- model.matrix(train$drafted~. , train)[,-1] #removes column of ones
+Y.vars <- train$drafted
+mod.glm.cv.lasso <- cv.glmnet(X.vars, Y.vars, lambda = lambda.seq, type.measure = 'class', family ='binomial')
+mod.glm.cv.lasso$cvm
+best.lambda <- mod.glm.cv.lasso$lambda.min
+plot(mod.glm.cv.lasso)
+mod.glm.lasso <- glmnet(X.vars, Y.vars, alpha = 1, lambda = best.lambda, family = 'binomial')
+coef(mod.glm.lasso)
+# find threshold
+X.vars.test <- model.matrix(test$drafted~. , test)[,-1]
+# Deprecated use a matrix as predictor. Unexpected results may be produced, please pass a numeric vector.
+pred.glm.lasso <- data.frame(round(predict(mod.glm.lasso, x.test, type= "response"), 4))
+#pred.glm.lasso <- predict(mod.glm.lasso, x.test, type= "response")
+mod.glm.lasso.roc <- report_auc(test$drafted, pred.glm.lasso)
+coords(mod.glm.lasso.roc, 'best')
+tr.lasso <- coords(mod.glm.lasso.roc, 'best')$threshold
+pred.glm[pred.glm >= tr] <- 1
+pred.glm[pred.glm < tr] <- 0
+report_all_metrics(test$drafted, pred.glm.lasso)
+report_confusion_matrix(test$drafted, pred.glm.lasso)
+
 ### ORDER OF REMOVAL BACKWARD STEPWISE SELECTION ###
 # mod.glm <- glm(drafted~.-free_pct, data = train, family = binomial)
 # summary(mod.glm)
@@ -388,7 +454,7 @@ report_confusion_matrix(test$drafted, pred.glm)
 # 6. def_reb 0.017083
 # END, all 3 *
 
-
+mod.glm=select_glm_lasso(train)
 
 
 

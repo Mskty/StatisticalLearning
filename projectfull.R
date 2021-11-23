@@ -531,4 +531,71 @@ plot(cv.lasso)
 mod.glm.lasso <- glmnet(X.vars, Y.vars, alpha = 1, lambda = best.lambda, family = 'binomial')
 # print coefficients (shows the ones put to zeros)
 coef(mod.glm.lasso)
+# get the excluded column_names (this gives all the features with coefficient non zeros in lasso model)
+lasso.included <- coef(mod.glm.lasso)@Dimnames[[1]][coef(mod.glm.lasso)@i][-1] #exclude intercept
+lasso.columns <- c()
+for (i in names(train[-20])) {
+  if(!(i %in% lasso.included)) {
+    lasso.columns <- c(lasso.columns, i)
+  }
+}
+
+# make the predictions
+X.vars.test <- model.matrix(test$drafted~. , test)[,-1]
+pred.glm.lasso <- data.frame(predict(mod.glm.lasso, X.vars.test, type= "response")) # must be put in a dataframe to work
+names(pred.glm.lasso) <- c('Probability') # senza questo non funziona la roc (passare pred.glm.lasso$Probability )
+# find the optimal threshold and print the plot (this also prints the roc)
+mod.glm.lasso.roc <- report_roc(test$drafted, pred.glm.lasso$Probability)
+# print the best threshold
+coords(mod.glm.lasso.roc, 'best')
+tr.glm.lasso <- coords(mod.glm.lasso.roc, 'best')
+# convert predictions in binary to calculate metrics
+pred.glm.lasso <- predict(mod.glm.lasso, X.vars.test, type= "response") # redo the predictions just to use the thresholds
+pred.glm.lasso.default <- pred.glm.lasso
+pred.glm.lasso.default[pred.glm.lasso.default >= tr.default] <- 1
+pred.glm.lasso.default[pred.glm.lasso.default < tr.default] <- 0
+pred.glm.lasso.optimal <- pred.glm.lasso
+pred.glm.lasso.optimal[pred.glm.lasso.optimal >= tr.glm.lasso] <- 1
+pred.glm.lasso.default[pred.glm.lasso.optimal < tr.glm.lasso] <- 0
+
+# print with knit the 2 confusion matrix side by side
+mtx.glm.lasso.default <- report_confusion_matrix(test$drafted, pred.glm.lasso.default)
+mtx.glm.lasso.optimal <- report_confusion_matrix(test$drafted, pred.glm.lasso.optimal)
+kable(list(mtx.glm.lasso.default, mtx.glm.lasso.optimal)) # THIS SHOULD PRINT THE 2 MTX SIDE BY SIDE MISSING CAPTIONS (NON SO COME AGGIUNGERLI PER OGNI ELEMENTO DELLA LISTA!!!!!!!!!)
+# Print the kable with the metrics
+mod.glm.lasso.default.metrics <- report_all("GLM default Threshold",test$drafted, pred.glm.lasso.default)
+mod.glm.lasso.optimal.metrics <- report_all("GLM optimal Threshold",test$drafted, pred.glm.lasso.optimal)
+table.df <- metrics_table(list(mod.glm.lasso.default.metrics, mod.glm.lasso.optimal.metrics))
+kable(table.df)
+
+# PRINT A TABLE WITH THE RESULTS FOR THE VARIUS FEATURE SELECTION METHODS (COLUMNS INCLUDED AND EXCLUDED)
+selection.constrains <- c()
+selection.aic <- c()
+selection.bic <- c()
+selection.lasso <- c()
+for (i in names(train[-20])) {
+  if (i %in% constrains.columns) {selection.constrains<-c(selection.constrains, '-')} 
+  if (!(i %in% constrains.columns)) {selection.constrains<-c(selection.constrains, 'X')} 
+  if (i %in% aic.columns) {selection.aic<-c(selection.aic, '-')} 
+  if (!(i %in% aic.columns)) {selection.aic<-c(selection.aic, 'X')}  
+  if (i %in% bic.columns) {selection.bic<-c(selection.bic, '-')} 
+  if (!(i %in% bic.columns)) {selection.bic<-c(selection.bic, 'X')}  
+  if (i %in% lasso.columns) {selection.lasso<-c(selection.lasso, '-')} 
+  if (!(i %in% lasso.columns)) {selection.lasso<-c(selection.lasso, 'X')}  
+}
+selection.full <- c("X","X","X","X","X","X","X","X","X","X","X","X","X","X","X","X","X","X","X")
+selection.table <- data.frame(names(train[-20]),selection.full,selection.constrains,selection.aic,selection.bic,selection.lasso)
+names(selection.table) <- c("Feature","Full","Constrained","AIC","BIC","LASSO")
+
+
+### END OF FEATURE SELECTION ON GLM
+
+### START OF MODEL REDUCED AND FULL RESULTS WITH METRICS
+
+
+
+
+
+
+
 

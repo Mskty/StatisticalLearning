@@ -111,7 +111,7 @@ boxplot_with_drafted <- function(df) {
   df<-as.data.frame(df)
   par(mfrow=c(6,4))
   # 1:19 lascia fuori drafted e le due dummy
-  for (i in 1:18) {
+  for (i in 1:19) {
     boxplot(df[,i] ~ df$drafted, main = names(df[i]), xlab = ' ', ylab = ' ',
             col = c('red', 'green'))
   }
@@ -181,7 +181,7 @@ search_best_knn <- function(train, maxk) {
   f1 <- c()
   k.values <- seq(1,maxk,1)
   for (i in k.values) {
-    knn.pred <- knn(train[1:18], sample.test[1:18], cl = train$drafted, k = i)
+    knn.pred <- knn(train[1:19], sample.test[1:19], cl = train$drafted, k = i)
     f1 <- c(f1, report_f1(sample.test$drafted, knn.pred))
   }
   plot(k.values, f1, type = 'l', xlab = 'Number of neighbors k', ylab = 'F1 Score')
@@ -285,7 +285,7 @@ select_glm_AIC <- function(train) {
   # glm.AIC <- bestglm(train, IC = 'AIC', method = "backward", family=binomial) NOME SOLO EXAUSTED CON BINOMIAL
   # intializing starting AIC (full model) and covariate list
   aics.best <- c(AIC(glm(drafted~., data = train, family = binomial)))
-  columns.kept <- c(names(train[-19]))
+  columns.kept <- c(names(train[-20]))
   columns.deleted <- c()
   while (TRUE) {
     aics.loop <- c()
@@ -324,7 +324,7 @@ select_glm_BIC <- function(train) {
   # glm.AIC <- bestglm(train, IC = 'AIC', method = "backward", family=binomial) NOME SOLO EXAUSTED CON BINOMIAL
   # intializing starting AIC (full model) and covariate list
   bics.best <- c(BIC(glm(drafted~., data = train, family = binomial)))
-  columns.kept <- c(names(train[-19]))
+  columns.kept <- c(names(train[-20]))
   columns.deleted <- c()
   while (TRUE) {
     bics.loop <- c()
@@ -363,8 +363,8 @@ select_glm_lasso <- function(train) {
   set.seed(42)
   # grid <- 10ˆseq(7, -5, length = 100)
   # Using lambdaseq to find list of lambdas, the max value sets all coefficients to 0
-  x.seq <- as.matrix(train[,1:18])
-  y.seq <- train[,19]
+  x.seq <- as.matrix(train[,1:19])
+  y.seq <- train[,20]
   lambda.seq <- lambdaseq(x.seq, y.seq)$lambda
   X.vars <- model.matrix(train$drafted~. , train)[,-1] #removes column of ones
   Y.vars <- train$drafted
@@ -419,8 +419,8 @@ report_confusion_matrix(test$drafted, pred.glm)
 
 # Get lasso
 set.seed(42)
-x.seq <- as.matrix(train[,1:18])
-y.seq <- train[,19]
+x.seq <- as.matrix(train[,1:19])
+y.seq <- train[,20]
 lambda.seq <- lambdaseq(x.seq, y.seq)$lambda
 X.vars <- model.matrix(train$drafted~. , train)[,-1] #removes column of ones
 Y.vars <- train$drafted
@@ -434,12 +434,14 @@ coef(mod.glm.lasso)
 X.vars.test <- model.matrix(test$drafted~. , test)[,-1]
 # Deprecated use a matrix as predictor. Unexpected results may be produced, please pass a numeric vector.
 pred.glm.lasso <- data.frame(round(predict(mod.glm.lasso, X.vars.test, type= "response"), 4))
+names(pred.glm.lasso) <- c('Probability') # senza questo non funziona la roc (passare pred.glm.lasso$Probability )
 #pred.glm.lasso <- predict(mod.glm.lasso, x.test, type= "response")
-mod.glm.lasso.roc <- report_auc(test$drafted, pred.glm.lasso)
+mod.glm.lasso.roc <- report_auc(test$drafted, pred.glm.lasso$Probability)
 coords(mod.glm.lasso.roc, 'best')
 tr.lasso <- coords(mod.glm.lasso.roc, 'best')$threshold
-pred.glm[pred.glm >= tr] <- 1
-pred.glm[pred.glm < tr] <- 0
+pred.glm.lasso <- predict(mod.glm.lasso, X.vars.test, type= "response") # redo the predictions just to use the thresholds
+pred.glm.lasso[pred.glm.lasso >= tr] <- 1
+pred.glm.lasso[pred.glm.lasso < tr] <- 0
 report_all_metrics(test$drafted, pred.glm.lasso)
 report_confusion_matrix(test$drafted, pred.glm.lasso)
 
@@ -456,8 +458,5 @@ report_confusion_matrix(test$drafted, pred.glm.lasso)
 # END, all 3 *
 
 mod.glm=select_glm_lasso(train)
-
-
-
 
 

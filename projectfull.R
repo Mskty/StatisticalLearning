@@ -17,6 +17,10 @@ library(Matrix)
 library(glmnet)
 library(tsutils)
 
+select <- dplyr::select
+
+filter <- dplyr::filter
+
 # PART TO SKIP: GENERATES THE FINAL DATASET
 df <- read.csv("dataset_finale.csv")
 # convert drafted to integer
@@ -210,7 +214,7 @@ mod.glm.roc <- report_roc(test$drafted, pred.glm)
 tr.default <- 0.5 
 # print the best threshold
 coords(mod.glm.roc, 'best')
-tr.glm <- coords(mod.glm.roc, 'best')
+tr.glm <- coords(mod.glm.roc, 'best')$threshold
 # convert predictions in binary to calculate metrics
 pred.glm.default <- pred.glm
 pred.glm.default[pred.glm.default >= tr.default] <- 1
@@ -248,7 +252,7 @@ pred.lda <- pred.lda$posterior[,2]
 mod.lda.roc <- report_roc(test$drafted, pred.lda)
 # print the best threshold
 coords(mod.lda.roc, 'best')
-tr.lda <- coords(mod.lda.roc, 'best')
+tr.lda <- coords(mod.lda.roc, 'best')$threshold
 # convert predictions in binary to calculate metrics
 pred.lda.default <- pred.lda
 pred.lda.default[pred.lda.default >= tr.default] <- 1
@@ -282,7 +286,7 @@ pred.qda <- pred.qda$posterior[,2]
 mod.qda.roc <- report_roc(test$drafted, pred.qda)
 # print the best threshold
 coords(mod.qda.roc, 'best')
-tr.qda <- coords(mod.qda.roc, 'best')
+tr.qda <- coords(mod.qda.roc, 'best')$threshold
 # convert predictions in binary to calculate metrics
 pred.qda.default <- pred.qda
 pred.qda.default[pred.qda.default >= tr.default] <- 1
@@ -445,7 +449,7 @@ select_glm_AIC <- function(train) {
     }
   }
   # return the columns deleted and aic_best 
-  aic.columns <- list(aics.best,columns.deleted)
+  aic.columns <- list(columns.deleted,aics.best)
   return(aic.columns)
 }
 
@@ -493,7 +497,7 @@ select_glm_BIC <- function(train) {
     }
   }
   # return the columns deleted and aic_best 
-  bic.columns <- list(bics.best,columns.deleted)
+  bic.columns <- list(columns.deleted,bics.best)
   return(bic.columns)
   
 }
@@ -548,7 +552,7 @@ names(pred.glm.lasso) <- c('Probability') # senza questo non funziona la roc (pa
 mod.glm.lasso.roc <- report_roc(test$drafted, pred.glm.lasso$Probability)
 # print the best threshold
 coords(mod.glm.lasso.roc, 'best')
-tr.glm.lasso <- coords(mod.glm.lasso.roc, 'best')
+tr.glm.lasso <- coords(mod.glm.lasso.roc, 'best')$threshold
 # convert predictions in binary to calculate metrics
 pred.glm.lasso <- predict(mod.glm.lasso, X.vars.test, type= "response") # redo the predictions just to use the thresholds
 pred.glm.lasso.default <- pred.glm.lasso
@@ -563,8 +567,8 @@ mtx.glm.lasso.default <- report_confusion_matrix(test$drafted, pred.glm.lasso.de
 mtx.glm.lasso.optimal <- report_confusion_matrix(test$drafted, pred.glm.lasso.optimal)
 kable(list(mtx.glm.lasso.default, mtx.glm.lasso.optimal)) # THIS SHOULD PRINT THE 2 MTX SIDE BY SIDE MISSING CAPTIONS (NON SO COME AGGIUNGERLI PER OGNI ELEMENTO DELLA LISTA!!!!!!!!!)
 # Print the kable with the metrics
-mod.glm.lasso.default.metrics <- report_all("GLM default Threshold",test$drafted, pred.glm.lasso.default)
-mod.glm.lasso.optimal.metrics <- report_all("GLM optimal Threshold",test$drafted, pred.glm.lasso.optimal)
+mod.glm.lasso.default.metrics <- report_all("LASSO default Threshold",test$drafted, pred.glm.lasso.default)
+mod.glm.lasso.optimal.metrics <- report_all("LASSO optimal Threshold",test$drafted, pred.glm.lasso.optimal)
 table.df <- metrics_table(list(mod.glm.lasso.default.metrics, mod.glm.lasso.optimal.metrics))
 kable(table.df)
 
